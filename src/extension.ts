@@ -17,7 +17,7 @@ export function activate(context: ExtensionContext) {
     let script = context.asAbsolutePath(path.join('src', 'mydsl', 'bin', launcher));
     console.log("SCRIPT");
     console.log(script);
-    fs.chmod(script, "+x", () => {
+    fs.chmod(script, "001", () => {
         let serverOptions: ServerOptions = {
             run : { command: script },
             debug: { command: script, args: [], options: { env: createDebugEnv() } }
