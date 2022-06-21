@@ -19,7 +19,7 @@ export function activate(context: ExtensionContext) {
     console.log(script);
     fs.chmod(script, "001", () => {
         let serverOptions: ServerOptions = {
-            run : { command: script, transport: TransportKind.ipc },
+            run : { command: script, transport: TransportKind.socket },
             debug: { command: script, args: [], options: { env: createDebugEnv() } }
         };
         
