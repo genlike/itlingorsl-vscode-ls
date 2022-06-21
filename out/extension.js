@@ -9,13 +9,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activate = void 0;
+exports.deactivate = exports.activate = void 0;
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
-const vscode_jsonrpc_1 = require("vscode-jsonrpc");
+//import {Trace} from 'vscode-jsonrpc';
 const vscode_1 = require("vscode");
 const node_1 = require("vscode-languageclient/node");
+let lc;
 function activate(context) {
     // The server is a locally installed in src/mydsl
     let launcher = os.platform() === 'win32' ? 'start-ls-itlingo.bat' : 'start-ls-itlingo';
@@ -24,7 +25,7 @@ function activate(context) {
     console.log(script);
     fs.chmod(script, "001", () => {
         let serverOptions = {
-            run: { command: script },
+            run: { command: script, transport: node_1.TransportKind.socket },
             debug: { command: script, args: [], options: { env: createDebugEnv() } }
         };
         let clientOptions = {
@@ -34,7 +35,7 @@ function activate(context) {
             }
         };
         // Create the language client and start the client.
-        let lc = new node_1.LanguageClient('Xtext Server', serverOptions, clientOptions);
+        lc = new node_1.LanguageClient('Xtext Server', serverOptions, clientOptions);
         var disposable2 = vscode_1.commands.registerCommand("itlang.a.proxy", () => __awaiter(this, void 0, void 0, function* () {
             let activeEditor = vscode_1.window.activeTextEditor;
             if (!activeEditor || !activeEditor.document || activeEditor.document.languageId !== 'itlang') {
@@ -46,14 +47,21 @@ function activate(context) {
         }));
         context.subscriptions.push(disposable2);
         // enable tracing (.Off, .Messages, Verbose)
-        lc.trace = vscode_jsonrpc_1.Trace.Verbose;
-        let disposable = lc.start();
+        //lc.trace = Trace.Verbose;
+        lc.start();
         // Push the disposable to the context's subscriptions so that the 
         // client can be deactivated on extension deactivation
-        context.subscriptions.push(disposable);
+        //context.subscriptions.push(disposable);
     });
 }
 exports.activate = activate;
+function deactivate() {
+    if (!lc) {
+        return undefined;
+    }
+    return lc.stop();
+}
+exports.deactivate = deactivate;
 function createDebugEnv() {
     return Object.assign({
         JAVA_OPTS: "-Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=8000,suspend=n,quiet=y"
