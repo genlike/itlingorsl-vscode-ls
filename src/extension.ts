@@ -47,6 +47,7 @@ export function activate(context: ExtensionContext) {
         
         // enable tracing (.Off, .Messages, Verbose)
         lc.trace = Trace.Verbose;
+        
         let disposable = lc.start();
         
         // Push the disposable to the context's subscriptions so that the 
