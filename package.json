@@ -1,0 +1,72 @@
+{
+    "name": "xtext-vscode-example",
+    "displayName": "Xtext VS Code example",
+    "description": "A simple DSL example for VS Code",
+    "version": "0.0.30",
+    "publisher": "itemis",
+    "icon": "images/itemis.png",
+    "license": "EPL-1.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/itemis/xtext-languageserver-example.git"
+    },
+    "bugs": {
+        "url": "https://github.com/itemis/xtext-languageserver-example/issues"
+    },
+    "engines": {
+        "vscode": "^1.64.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:rsl"
+    ],
+    "main": "out/extension",
+    "contributes": {
+        "languages": [
+            {
+                "id": "rsl",
+                "aliases": [
+                    "rsl"
+                ],
+                "extensions": [
+                    ".rsl"
+                ],
+                "configuration": "./itlang.configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "rsl",
+                "scopeName": "source.rsl",
+                "path": "./syntaxes/itlang.tmLanguage.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "itlang.a.proxy",
+                "title": "RSL Command A"
+            },
+            {
+                "command": "itlang.b",
+                "title": "RSL Command B"
+            }
+        ]
+    },
+    "devDependencies": {
+        "@types/node": "^17.0.18",
+        "@types/vscode": "^1.64.0",
+        "typescript": "^4.5.5",
+        "vscode-test": "^1.5.2"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^7.0.0"
+    },
+    "scripts": {
+        "prepublish": "tsc -p ./src",
+        "compile": "tsc -p ./src",
+        "watch": "tsc -w -p ./src",
+        "update-vscode": "node ./node_modules/vscode/bin/install"
+    }
+}
