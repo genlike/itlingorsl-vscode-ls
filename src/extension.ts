@@ -9,7 +9,8 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-lan
 
 export function activate(context: ExtensionContext) {
     // The server is a locally installed in src/mydsl
-    let launcher = os.platform() === 'win32' ? 'start-ls-itlingo.bat' : 'start-ls-itlingo.sh';
+    
+    let launcher = os.platform() === 'win32' ? 'start-ls-itlingo.bat' : 'chmod +x start-ls-itlingo && start-ls-itlingo';
     let script = context.asAbsolutePath(path.join('src', 'mydsl', 'bin', launcher));
     console.log("Kappa");
     let serverOptions: ServerOptions = {
