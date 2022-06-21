@@ -15,7 +15,7 @@ export function activate(context: ExtensionContext) {
     console.log("SCRIPT");
     console.log(script);
     let serverOptions: ServerOptions = {
-        run : { command: "chmod +x " + script + "&& " + script },
+        run : { command: "chmod +x " + script + " && " + script },
         debug: { command: script, args: [], options: { env: createDebugEnv() } }
     };
     
