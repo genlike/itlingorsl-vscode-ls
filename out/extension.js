@@ -19,7 +19,16 @@ function activate(context) {
     // The server is a locally installed in src/mydsl
     let launcher = os.platform() === 'win32' ? 'start-ls-itlingo.bat' : 'start-ls-itlingo';
     let script = context.asAbsolutePath(path.join('src', 'mydsl', 'bin', launcher));
-    console.log("Kappa");
+    console.log("SCRIPT");
+    console.log(script);
+    const cp = require('child_process');
+    cp.exec('chmod +x ' + script, (err, stdout, stderr) => {
+        console.log('stdout: ' + stdout);
+        console.log('stderr: ' + stderr);
+        if (err) {
+            console.log('error: ' + err);
+        }
+    });
     let serverOptions = {
         run: { command: script },
         debug: { command: script, args: [], options: { env: createDebugEnv() } }

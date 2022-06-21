@@ -7,6 +7,8 @@ import {Trace} from 'vscode-jsonrpc';
 import { commands, window, workspace, ExtensionContext, Uri } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 
+
+
 export function activate(context: ExtensionContext) {
     // The server is a locally installed in src/mydsl
     
@@ -14,8 +16,16 @@ export function activate(context: ExtensionContext) {
     let script = context.asAbsolutePath(path.join('src', 'mydsl', 'bin', launcher));
     console.log("SCRIPT");
     console.log(script);
+    const cp = require('child_process')
+    cp.exec('chmod +x ' + script, (err, stdout, stderr) => {
+        console.log('stdout: ' + stdout);
+        console.log('stderr: ' + stderr);
+        if (err) {
+            console.log('error: ' + err);
+        }
+    });
     let serverOptions: ServerOptions = {
-        run : { command: "chmod +x " + script + " && " + script },
+        run : { command: script },
         debug: { command: script, args: [], options: { env: createDebugEnv() } }
     };
     
