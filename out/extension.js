@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = void 0;
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
 const vscode_jsonrpc_1 = require("vscode-jsonrpc");
 const vscode_1 = require("vscode");
 const node_1 = require("vscode-languageclient/node");
@@ -21,42 +22,36 @@ function activate(context) {
     let script = context.asAbsolutePath(path.join('src', 'mydsl', 'bin', launcher));
     console.log("SCRIPT");
     console.log(script);
-    const cp = require('child_process');
-    cp.exec('chmod +x ' + script, (err, stdout, stderr) => {
-        console.log('stdout: ' + stdout);
-        console.log('stderr: ' + stderr);
-        if (err) {
-            console.log('error: ' + err);
-        }
+    fs.chmod(script, "001", () => {
+        let serverOptions = {
+            run: { command: script },
+            debug: { command: script, args: [], options: { env: createDebugEnv() } }
+        };
+        let clientOptions = {
+            documentSelector: ['itlang'],
+            synchronize: {
+                fileEvents: vscode_1.workspace.createFileSystemWatcher('**/*.*')
+            }
+        };
+        // Create the language client and start the client.
+        let lc = new node_1.LanguageClient('Xtext Server', serverOptions, clientOptions);
+        var disposable2 = vscode_1.commands.registerCommand("itlang.a.proxy", () => __awaiter(this, void 0, void 0, function* () {
+            let activeEditor = vscode_1.window.activeTextEditor;
+            if (!activeEditor || !activeEditor.document || activeEditor.document.languageId !== 'itlang') {
+                return;
+            }
+            if (activeEditor.document.uri instanceof vscode_1.Uri) {
+                vscode_1.commands.executeCommand("itlang.a", activeEditor.document.uri.toString());
+            }
+        }));
+        context.subscriptions.push(disposable2);
+        // enable tracing (.Off, .Messages, Verbose)
+        lc.trace = vscode_jsonrpc_1.Trace.Verbose;
+        let disposable = lc.start();
+        // Push the disposable to the context's subscriptions so that the 
+        // client can be deactivated on extension deactivation
+        context.subscriptions.push(disposable);
     });
-    let serverOptions = {
-        run: { command: script },
-        debug: { command: script, args: [], options: { env: createDebugEnv() } }
-    };
-    let clientOptions = {
-        documentSelector: ['itlang'],
-        synchronize: {
-            fileEvents: vscode_1.workspace.createFileSystemWatcher('**/*.*')
-        }
-    };
-    // Create the language client and start the client.
-    let lc = new node_1.LanguageClient('Xtext Server', serverOptions, clientOptions);
-    var disposable2 = vscode_1.commands.registerCommand("itlang.a.proxy", () => __awaiter(this, void 0, void 0, function* () {
-        let activeEditor = vscode_1.window.activeTextEditor;
-        if (!activeEditor || !activeEditor.document || activeEditor.document.languageId !== 'itlang') {
-            return;
-        }
-        if (activeEditor.document.uri instanceof vscode_1.Uri) {
-            vscode_1.commands.executeCommand("itlang.a", activeEditor.document.uri.toString());
-        }
-    }));
-    context.subscriptions.push(disposable2);
-    // enable tracing (.Off, .Messages, Verbose)
-    lc.trace = vscode_jsonrpc_1.Trace.Verbose;
-    let disposable = lc.start();
-    // Push the disposable to the context's subscriptions so that the 
-    // client can be deactivated on extension deactivation
-    context.subscriptions.push(disposable);
 }
 exports.activate = activate;
 function createDebugEnv() {
