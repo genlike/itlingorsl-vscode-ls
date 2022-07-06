@@ -1,0 +1,1620 @@
+/*
+ * ITLingo's RSL (Requirements Specification Language) Grammar
+ 
+ * Author: Alberto Rodrigues da Silva
+ * Created Date: 2016/August
+ * 
+ * History
+ * -------
+ *  
+ * 2016/August
+ * V.1.0 Created
+ *
+ * ----
+ * 2017/January
+ * RSL v1.1 
+ * Review and consolidation of RSL
+ * 
+ * Added <UserStory> rule: As a <actor>, I want <goal> so that  <receive benefit>.
+ * Added Variability Features
+ *
+ * ----
+ * 2017/February 
+ * RSL v.2.0
+ * Review and consolidation of RSL
+ * Changes to better align names/constructs with Archimate language
+ * 
+ * 2017/April
+ * RSL v.3.0
+ * Major changes:
+ * - major changes of business-level's constructs
+ * - writing style: replaced "{...}" by "[...]" to avoid programming languages' style
+ * - package names and package organization simplified
+ * - "project" construct is optional 
+ * - some enumerations updated
+ * 
+ * 2017/July
+ * RSL v.3.1
+ * Minor changes:
+  * - QR: replace value (e.g., 4) by expression (e.g.,  >= 4)
+  * - Added DoubleOrInt and Percentage general rules
+ 
+ 
+ * 2018/March-May
+ * RSL v.3.2
+ * Major changes:
+  - Replaced type+subtype for Constraints + BusinessGoals
+  - Replaced type+subtype for QRs + Goals
+  - Added the following qualifiers of Requirements: 
+		(isNegative ?= 'isNegative')?  // if not defined "isPositive" by default
+		(isConcrete ?= 'isConcrete')?  // if not defined "isAbstract" by default
+		(isSolution ?= 'isSolution')?  // if not defined "isProblem" by default
+ - Added
+ 		UserStory (changed) with AcceptanceCriteria
+ - Added
+ 		RequirementsTheme (as a set of related Requirements)
+ - Added
+ 		Security-specific elements: Risk/Threat, RiskTreatment, Vulnerability, ...
+ - Update for writing style: "element <name (<id>) : <type> [ other properties ]"
+
+
+ * 2018/June-July
+ * RSL v.4.0
+ * Major changes:
+  - Grammar major re-structure: 
+   		Package :=  System
+   		System :=  SystemConcepts + SystemViews
+   		SystemConcept := SystemElements | SystemRelations
+  - Added IncludeElement + IncludeAll 
+  - Refined Names and Types: 
+   		DataEntityView => DataEntityCluster
+		DataEntityType/SubType
+
+ * 2018/Sept
+ * RSL v.4.1
+ * Major changes:
+  - Grammar major re-structure related the inclusion of Tests: 
+    Tests are defined in the scope of a System
+    		SystemConcept := ... Test | ...
+  * RSL v.4.2
+  - replaced enum by data-rules
+  - fix other rules, names etc.
+
+ * 2020/Feb
+ * RSL v.4.3
+ * Major changes:
+  - Update DataEnumeration: without types
+  - Re-structure of DataEntities architecture:
+    - Added DataConstraint:  DataEntityConstraint | DataAttributeConstraint
+
+ * 2020/May
+ * RSL v.4.4
+  * Major changes in the Type/SubTypes, to provide extensibility features 
+ * Minor changes on DataEntities architecture:
+    - Updated DataConstraint ForeignKey 
+    - Added DataConstraint ManyToMany 
+ 
+ 
+  * 2021/Feb
+ * RSL v.4.5
+ * Minor changes on DataEntities architecture:
+     - Added Data construct 
+ * Minor changes on UsecaseTest architecture:
+     - Added Data construct 
+    
+   
+ */   
+
+grammar org.itlingo.rsl.Rsl 
+		with org.eclipse.xtext.common.Terminals 
+
+generate rsl "http://www.itlingo.org/rsl/Rsl"
+
+
+Model: (packages+= PackageAbstract)*; 
+	
+
+/********************************************************************************
+ * Names and Import Rule(s)
+*********************************************************************************/
+
+QualifiedName:
+  	ID ('.' ID)*;
+
+QualifiedNameWithWildcard:
+  	QualifiedName '.*'?;
+  	
+Import:
+	'Import' importedNamespace=QualifiedNameWithWildcard;
+
+/********************************************************************************
+ * General Rule(s)
+*********************************************************************************/
+
+terminal DOUBLE: INT '.' INT;
+									  
+DoubleOrInt: DOUBLE | INT;
+
+Percentage hidden(): DoubleOrInt '%';
+
+Month: type=('Jan'|'Feb'|'Mar'|'Apr'|'May'|'Jun'|'Jul'|'Aug'|'Sep'|'Oct'|'Nov'|'Dec');
+
+Date: day=INT '-' month=Month '-' year=INT;
+
+AttributeValue :  value= STRING | Date | Month | {AttributeValue} DoubleOrInt | {AttributeValue} Percentage;
+
+Multiplicity: type=('"0"' | '"1"' | '"0..1"' | '"*"' | STRING);
+
+Expression:
+	'expression' '[' operator = ExpressionOperator  value = INT   metric=MetricType ']' ;	
+
+ExpressionOperator:	value = ('>' | '<' | '=' | '>=' | '<=' | '<>');
+
+Tag: 'tag' '(' 'name' nameAlias=STRING ('value' value=STRING)? ')';
+
+Stereotype: 
+	'stereotype' name=ID  (nameAlias=STRING)?  ':' type=StereotypeType ('['
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+IncludeAll :
+	'IncludeAll'  'fromSystem' system=[System] ('['
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+	
+
+IncludeElement:
+	'Include' /* name=ID  (nameAlias=STRING)?  ':' */ type=IncludeSystemElementType 'fromSystem' system=[System] 
+		'element' element=[SystemElement  | QualifiedName] ('['
+		(updateFields= UpdateFields)?		
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+UpdateFields: 
+	'updateFields'  updateFields += UpdateField (',' updateFields += UpdateField )*;
+
+UpdateField: 
+	(nameField=STRING) "with" (valueField=STRING);
+
+	
+
+
+/********************************************************************************
+ * Packages Rule(s)
+*********************************************************************************/
+
+PackageAbstract: PackageSystem; 
+
+PackageSystem:
+	'Package' name=QualifiedName
+		(imports+=Import)*
+  
+		( (system=System) ) ;
+		
+/********************************************************************************
+ * System Rule(s)
+*********************************************************************************/
+System:
+	'System' name=ID  (nameAlias=STRING)? ':' type=SystemType (':' subType=SystemSubType)? ('['
+		((isReusable ?= 'isReusable') | (isFinal  ?= 'isFinal'))?  // "isFinal" by default
+		(isTestSuite ?= 'isTestSuite' ('systemUnderTest' sut= [System]) )? 
+		('partOf' partOf=[System])?
+		// ('subSystems' subSystems=RefSystems)?
+		// ('reusableSystems' reusableSystems=RefSystems)?
+		('vendor' vendor=STRING)?
+		('version' version=STRING)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?
+
+	(systemConcepts+=SystemConcept*) 
+	;
+ 
+ 
+RefSystems: refs+=[System] (',' refs+=[System])*;
+
+
+SystemConcept:	SystemElement | SystemRelation | SystemSet ;
+					
+SystemElement:	StructureElement | BehaviorElement | Requirement  | Test | OtherElement | IncludeElementGeneric;
+													  
+StructureElement: ActiveStructureElement  |  PassiveStructureElement ;
+																				  
+PassiveStructureElement: DataEnumeration | DataEntityGeneric | Data;
+		 
+DataEntityGeneric:	DataEntity | DataEntityCluster ;
+
+ActiveStructureElement:	Stakeholder | Actor;	
+	
+BehaviorElement: StateMachine | ActiveElement ;	
+  
+OtherElement:	GlossaryTerm | 	RiskGeneric | Stereotype | TypeExtended;
+								 
+RiskGeneric: Vulnerability | Risk; 
+
+IncludeElementGeneric: IncludeAll | IncludeElement;	
+	
+SystemRelation: SystemsRelation | RequirementsRelation | TestsRelation | ElementsRelation;
+
+SystemSet:	View | Theme;
+ 
+
+/********************************************************************************
+ * Types and SubTypes Rule(s)
+*********************************************************************************/
+
+/* 
+Type:
+	SystemType | SystemSubType | 
+	MetricType | PriorityType | 
+	StakeholderType | StakeholderSubType | ActorType | 
+	GlossaryTermType | 
+	ActiveEventType | ActiveTaskType | ActiveFlowType | 
+	FRType | QRType | QRSubType | ConstraintType | ConstraintSubType | GoalType | GoalSubType |
+	UserStoryType | UseCaseType | ActionType |
+	DataEntityType | DataEntitySubType | DataEntityClusterType | DataAttributeType | 
+	StateMachineType |	
+	TestType | TestScenarioType | ScenarioType | CheckType | StepType | StepSubType |
+	VulnerabilityType | VulnerabilitySubType | VulnerabilityAttackVector | 
+	RiskType | RiskSubType | RiskTreatmentType | 	
+	RelationType | SystemsRelationType | SystemsRelationCategory | RequirementsRelationType | TestsRelationTypeExtended	|
+	StereotypeType
+	;
+*/	
+TypeExtended:
+	SystemTypeExtended | SystemSubTypeExtended | 
+	MetricTypeExtended | PriorityTypeExtended | 
+	StakeholderTypeExtended | StakeholderSubTypeExtended | ActorTypeExtended | 
+	GlossaryTermTypeExtended | 
+	ActiveEventTypeExtended | ActiveTaskTypeExtended | ActiveFlowTypeExtended | 
+	FRTypeExtended | QRTypeExtended | QRSubTypeExtended | ConstraintTypeExtended | ConstraintSubTypeExtended | GoalTypeExtended | GoalSubTypeExtended |
+	UserStoryTypeExtended | UseCaseTypeExtended | ActionTypeExtended |
+	DataEntityTypeExtended | DataEntitySubTypeExtended | DataEntityClusterTypeExtended | DataAttributeTypeExtended | ForeignKeyOnDeleteTypeExtended |
+	StateMachineTypeExtended |	
+	TestTypeExtended | TestScenarioTypeExtended | ScenarioTypeExtended | CheckTypeExtended | StepTypeExtended | StepSubTypeExtended | StepSubSubTypeExtended |
+	VulnerabilityTypeExtended | VulnerabilitySubTypeExtended | VulnerabilityAttackVectorExtended | 
+	RiskTypeExtended | RiskSubTypeExtended | RiskTreatmentTypeExtended | 	
+	RelationTypeExtended | SystemsRelationTypeExtended | SystemsRelationCategoryExtended | RequirementsRelationTypeExtended | TestsRelationTypeExtended	|
+	StereotypeTypeExtended
+	;
+
+
+SystemType: SystemTypeOriginal |SystemTypeExtendedRef;
+SystemTypeExtended: 'SystemType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+SystemTypeExtendedRef: type= [SystemTypeExtended | QualifiedName];
+SystemTypeOriginal: type= ('Business' | 'Application' | 'SoftwareSystem' | 'HardwareSystem' | 'Other');  
+	
+SystemSubType: SystemSubTypeOriginal |SystemSubTypeExtendedRef;
+SystemSubTypeExtended: 'SystemSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+SystemSubTypeExtendedRef: type= [SystemSubTypeExtended | QualifiedName];
+SystemSubTypeOriginal: type= ('Business_PublicSector' | 'Business_IT' | 'Business_Other' |
+	'Application_Web' | 'Application_Mobile' | 'Application_Desktop' | 'Application_Sensor' | 'Application_Actuator' | 'Application_Other' |
+	'SoftwareSystem_OS' | 'SoftwareSystem_VM' | 'SoftwareSystem_DBMS' | 'SoftwareSystem_WebServer' | 'SoftwareSystem_WebClient' | 
+	'SoftwareSystem_EmailServer' | 'SoftwareSystem_EmailClient' | 'SoftwareSystem_OfficeTool' | 'SoftwareSystem_OtherServer' | 'SoftwareSystem_OtherClient' | 'SoftwareSystem_Other' | 
+	'HardwareSystem_Server' | 'HardwareSystem_Desktop' | 'HardwareSystem_Laptop' | 'HardwareSystem_Smartphone' | 'HardwareSystem_Smartwatch' | 'HardwareSystem_Sensor' | 'HardwareSystem_Actuator' | 
+	'HardwareSystem_Storage' | 'HardwareSystem_Printer' | 'HardwareSystem_Network' | 'HardwareSystem_Other' );
+
+
+MetricType: MetricTypeOriginal | MetricTypeExtendedRef;
+MetricTypeExtended: 'MetricType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+MetricTypeExtendedRef: type= [MetricTypeExtended | QualifiedName];
+MetricTypeOriginal: type = ('Time_Day' | 'Time_Hour' | 'Time_Min' | 'Time_Sec' | 'Time_mSec' | 
+	'Frequency_Hz' | 'Frequency_KHz' | 'Frequency_MHz' |
+	'Capacity_KByte' | 'Capacity_MByte' | 'Capacity_GByte' | 'Capacity_TByte' | 'Capacity_PByte' | 'Capacity_EByte' |
+	'Task' | 'Error' | 'Error_PerTask' | 'Click' |
+	'Range_LikertScale' | 'Range_Binary' | 'Range_Other' | 'Other');
+
+PriorityType: PriorityTypeOriginal |PriorityTypeExtendedRef;
+PriorityTypeExtended: 'PriorityType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+PriorityTypeExtendedRef: type= [PriorityTypeExtended | QualifiedName];
+PriorityTypeOriginal: type = ('VeryHigh' | 'High' | 'Medium' | 'Low' | 'VeryLow');
+ImpactLevel: type = ('VeryHigh' | 'High' | 'Medium' | 'Low' | 'VeryLow');
+
+
+StakeholderType: StakeholderTypeOriginal |StakeholderTypeExtendedRef;
+StakeholderTypeExtended: 'StakeholderType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StakeholderTypeExtendedRef: type= [StakeholderTypeExtended | QualifiedName];
+StakeholderTypeOriginal: type = ('Organization' | 'OrganizationalUnit' | 'Person' | 'System' | 'Other');
+
+StakeholderSubType: StakeholderSubTypeOriginal |StakeholderSubTypeExtendedRef;
+StakeholderSubTypeExtended: 'StakeholderSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StakeholderSubTypeExtendedRef: type= [StakeholderSubTypeExtended | QualifiedName];
+StakeholderSubTypeOriginal: type = (
+	'Organization_Owner' | 'Organization_Customer' | 'Organization_Sponsor' | 'Organization_Partner' | 'Organization_Government' | 'Organization_RegulatorAgent' | 
+	'OrganizationalUnit_IT' | 'OrganizationalUnit_Operations' | 'OrganizationalUnit_Support' | 'OrganizationalUnit_Other' |
+	'Person_User' | 'Person_Manager' | 'Person_Manager_ProjectManager' | 'Person_Manager_TeamManager' | 'Person_Manager_FunctionalManager' | 
+	'Person_Technical' | 'Person_Technical_BusinessAnalyst' | 'Person_Technical_RequirementsEngineer' | 'Person_Technical_Trainer' | 'Person_Technical_Trainee' | 
+	'Person_Technical_SoftwareArchitect' | 'Person_Technical_SoftwareDeveloper' | 'Person_Technical_SoftwareDesigner' | 'Person_Technical_SoftwareTester' | 
+	'System_Internal' | 'System_External' | 'System_Other' | 
+	'Other');
+
+ActorType: ActorTypeOriginal |ActorTypeExtendedRef;
+ActorTypeExtended: 'ActorType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ActorTypeExtendedRef: type= [ActorTypeExtended | QualifiedName];
+ActorTypeOriginal: type = ('User' | 'ExternalSystem' /* | 'TimerEvent' */ | 'Other');
+
+GlossaryTermType: GlossaryTermTypeOriginal |GlossaryTermTypeExtendedRef;
+GlossaryTermTypeExtended: 'GlossaryTermType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+GlossaryTermTypeExtendedRef: type= [GlossaryTermTypeExtended | QualifiedName];
+GlossaryTermTypeOriginal /*Part-Of-Speech */: type = ('Adjective' | 'Adverb' | 'Noun' | 'Verb');
+TermApplicableTo: type = ('System' | 'Stakeholder' | 'Actor' | 'DataEntity' | 'Other');
+
+ActiveEventType: ActiveEventTypeOriginal |ActiveEventTypeExtendedRef;
+ActiveEventTypeExtended: 'ActiveEventType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ActiveEventTypeExtendedRef: type= [ActiveEventTypeExtended | QualifiedName];
+ActiveEventTypeOriginal: type = ('Send' | 'Receive' | 'Timer' | 'Terminate' | 'Cancel' | 'Error' | 'Signal' | 'Conditional' | 'Undefined'); 
+
+ActiveTaskType: ActiveTaskTypeOriginal |ActiveTaskTypeExtendedRef;
+ActiveTaskTypeExtended: 'ActiveTaskType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ActiveTaskTypeExtendedRef: type= [ActiveTaskTypeExtended | QualifiedName];
+ActiveTaskTypeOriginal: type = ('Manual' | 'User' | 'Service' | 'Send' | 'Receive' | 'Script' | 'BusinessRule' | 'Undefined'); 
+
+ActiveFlowType: ActiveFlowTypeOriginal |ActiveFlowTypeExtendedRef;
+ActiveFlowTypeExtended: 'ActiveFlowType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ActiveFlowTypeExtendedRef: type= [ActiveFlowTypeExtended | QualifiedName];
+ActiveFlowTypeOriginal: type = ('Sequence' | 'SequenceConditional' | 'Parallel');
+
+
+
+FRType: FRTypeOriginal | FRTypeExtendedRef;
+FRTypeExtended: 'FRType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+FRTypeExtendedRef: type= [FRTypeExtended | QualifiedName];
+FRTypeOriginal: type = ('Functional' | 'Behavioral' | 'Data');
+
+// Q (Qualities of a System; for QRs and Goals)
+// Based on 
+// ISO/IEC 25010: Systems and software engineering Systems and software Quality Requirements and Evaluation (SQuaRE) 
+// System and software quality models 
+GoalType: GoalTypeOriginal | GoalTypeExtendedRef;
+GoalTypeExtended: 'GoalType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+GoalTypeExtendedRef: type= [GoalTypeExtended | QualifiedName];
+GoalTypeOriginal: type = (
+	'Functional' | 'Performance' | 'Compatibility' | 'Usability' | 'Reliability' | 'Security' | 
+	'Maintainability' | 'Portability' | 'Privacy' | 'Cultural' | 'Legal' | 'Other');
+
+GoalSubType: GoalSubTypeOriginal | GoalSubTypeExtendedRef;
+GoalSubTypeExtended: 'GoalSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+GoalSubTypeExtendedRef: type= [GoalSubTypeExtended | QualifiedName];
+GoalSubTypeOriginal: type = (
+	'Performance_SystemResponseTime' | 'Performance_NetworkResponseTime' | 'Performance_MemoryCapacity' | 'Performance_DiskCapacity' | 'Performance_Other' |
+	'Compatibility_CoExistence' | 'Compatibility_Interoperability' | 'Compatibility_Other' |
+	'Usability_AappropriatenessRecognizability' | 'Usability_Learnability' | 'Usability_Operability' | 'Usability_UserErrorProtection' | 
+	'Usability_UserInterfaceAesthetics' | 'Usability_Accessibility' | 'Usability_Other' |
+	'Reliability_Maturity' | 'Reliability_Availability' | 'Reliability_FaultTolerance' | 'Reliability_Recoverability' | 'Reliability_Other' |
+	'Security_Authentication' | 'Security_Authorization' | 'Security_Confidentiality' | 'Security_Integrity' | 'Security_NonRepudiation' | 'Security_Accountability' | 
+	'Security_PhysicalProtection' | 'Security_Recovery' | 'Security_Other' |
+	'Maintainability_Modularity' | 'Maintainability_Reusability' | 'Maintainability_Analyzability' | 'Maintainability_Modifiability' | 'Maintainability_Testability' | 'Maintainability_Other' |
+	'Portability_Adaptability' | 'Portability_Installability' | 'Portability_Replaceability' | 'Portability_Other' |
+	'Privacy_Collection' | 'Privacy_Disclosure' | 'Privacy_Retention' | 'Privacy_Usage' | 'Privacy_Informative' | 'Privacy_Other' |
+	'Cultural_Language' | 'Cultural_Currency' | 'Cultural_Other' |
+	'Legal_National' | 'Legal_International' | 'Legal_Other');
+
+QRType: QRTypeOriginal | QRTypeExtendedRef;
+QRTypeExtended: 'QRType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+QRTypeExtendedRef: type= [QRTypeExtended | QualifiedName];
+QRTypeOriginal: type = (
+	'Functional' | 'Performance' | 'Compatibility' | 'Usability' | 'Reliability' | 'Security' | 
+	'Maintainability' | 'Portability' | 'Privacy' | 'Cultural' | 'Legal' | 'Other');
+
+QRSubType: QRSubTypeOriginal |QRSubTypeExtendedRef;
+QRSubTypeExtended: 'QRSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+QRSubTypeExtendedRef: type= [QRSubTypeExtended | QualifiedName];
+QRSubTypeOriginal: type = (
+	'Performance_SystemResponseTime' | 'Performance_NetworkResponseTime' | 'Performance_MemoryCapacity' | 'Performance_DiskCapacity' | 'Performance_Other' |
+	'Compatibility_CoExistence' | 'Compatibility_Interoperability' | 'Compatibility_Other' |
+	'Usability_AappropriatenessRecognizability' | 'Usability_Learnability' | 'Usability_Operability' | 'Usability_UserErrorProtection' | 
+	'Usability_UserInterfaceAesthetics' | 'Usability_Accessibility' | 'Usability_Other' |
+	'Reliability_Maturity' | 'Reliability_Availability' | 'Reliability_FaultTolerance' | 'Reliability_Recoverability' | 'Reliability_Other' |
+	'Security_Authentication' | 'Security_Authorization' | 'Security_Confidentiality' | 'Security_Integrity' | 'Security_NonRepudiation' | 'Security_Accountability' | 
+	'Security_PhysicalProtection' | 'Security_Recovery' | 'Security_Other' |
+	'Maintainability_Modularity' | 'Maintainability_Reusability' | 'Maintainability_Analyzability' | 'Maintainability_Modifiability' | 'Maintainability_Testability' | 'Maintainability_Other' |
+	'Portability_Adaptability' | 'Portability_Installability' | 'Portability_Replaceability' | 'Portability_Other' |
+	'Privacy_Collection' | 'Privacy_Disclosure' | 'Privacy_Retention' | 'Privacy_Usage' | 'Privacy_Informative' | 'Privacy_Other' |
+	'Cultural_Language' | 'Cultural_Currency' | 'Cultural_Other' |
+	'Legal_National' | 'Legal_International' | 'Legal_Other');
+
+ConstraintType: ConstraintTypeOriginal | ConstraintTypeExtendedRef;
+ConstraintTypeExtended: 'ConstraintType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ConstraintTypeExtendedRef: type= [ConstraintTypeExtended | QualifiedName];
+ConstraintTypeOriginal: type = ('Cultural' | 'Legal' | 'Organizational' | 'Project' | 'Technological' | 'Physical' | 'Other');
+
+ConstraintSubType: ConstraintSubTypeOriginal |ConstraintSubTypeExtendedRef;
+ConstraintSubTypeExtended: 'ConstraintSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ConstraintSubTypeExtendedRef: type= [ConstraintSubTypeExtended | QualifiedName];
+ConstraintSubTypeOriginal: type = (
+	'Cultural_Language' | 'Cultural_Currency' | 'Cultural_Other' |
+	'Legal_National' | 'Legal_International' | 'Legal_Other' |
+	'Organizational_Politics' | 'Organizational_Management' | 'Organizational_Other' |
+	'Project_Cost' | 'Project_Time' | 'Project_Scope' | 'Project_Quality' | 'Project_Risk' | 'Project_Other' |
+	'Technological_PlatformHardware' | 'Technological_PlatformSoftware' | 'Technological_DevelopmentTool' |
+	'Physical_Concrete' | 'Physical_Abstract' |
+	'Other');
+	
+UserStoryType: UserStoryTypeOriginal | UserStoryTypeExtendedRef;
+UserStoryTypeExtended: 'UserStoryType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+UserStoryTypeExtendedRef: type= [UserStoryTypeExtended | QualifiedName];
+UserStoryTypeOriginal: type = ('Epic' | 'UserStory' | 'Other');
+
+
+UseCaseType: UseCaseTypeOriginal | UseCaseTypeExtendedRef;
+UseCaseTypeExtended: 'UseCaseType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+UseCaseTypeExtendedRef: type= [UseCaseTypeExtended | QualifiedName];
+UseCaseTypeOriginal: type = (
+	'EntityCreate' | 'EntityRead' | 'EntityUpdate' | 'EntityDelete' | 'EntityReport' | 'EntityDashboard' | 'EntityOther' | 
+	'EntitiesManage' | 'EntitiesBrowse' | 'EntitiesSearch' | 'EntitiesReport' | 'EntitiesDashboard' | 
+	'EntitiesInteropImport' | 'EntitiesInteropExport' | 'EntitiesInteropSync' | 
+	'EntitiesInteropSendMessage' | 'EntitiesInteropServiceInvocation' | 
+	'EntitiesMapShow' | 'EntitiesMapInteract' | 'EntitiesOther' | 
+	'Other');
+
+ActionType: ActionTypeOriginal | ActionTypeExtendedRef;
+ActionTypeExtended: 'ActionType' name=ID  (nameAlias=STRING)? ('[' ('description' description=STRING)? ']' )?;
+ActionTypeExtendedRef: type= [ActionTypeExtended | QualifiedName];
+ActionTypeOriginal: type = ('aCreate' | 'aRead' | 'aUpdate' | 'aDelete');
+
+
+
+DataEntityType: DataEntityTypeOriginal |DataEntityTypeExtendedRef;
+DataEntityTypeExtended: 'DataEntityType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+DataEntityTypeExtendedRef: type= [DataEntityTypeExtended | QualifiedName];
+DataEntityTypeOriginal: type = ('Parameter' | 'Reference' | 'Master' | 'Document' | 'Transaction' | 'Other');
+//See: https://docs.microsoft.com/en-us/dynamics365/unified-operations/dev-itpro/data-entities/data-entities?toc=/fin-and-ops/toc.json#categories-of-entities
+
+DataEntitySubType: DataEntitySubTypeOriginal |DataEntitySubTypeExtendedRef;
+DataEntitySubTypeExtended: 'DataEntitySubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+DataEntitySubTypeExtendedRef: type= [DataEntitySubTypeExtended | QualifiedName];
+DataEntitySubTypeOriginal: type = ('Regular' | 'Weak' | 'Other');
+
+DataEntityClusterType: DataEntityClusterTypeOriginal |DataEntityClusterTypeExtendedRef;
+DataEntityClusterTypeExtended: 'DataEntityClusterType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+DataEntityClusterTypeExtendedRef: type= [DataEntityClusterTypeExtended | QualifiedName];
+DataEntityClusterTypeOriginal: type = ('Parameter' | 'Reference' | 'Master' | 'Document' | 'Transaction' | 'Other');
+
+//** DataAttributeType
+DataAttributeType: (DataAttributeTypeOriginal ('(' size = DoubleOrInt ')')? | DataAttributeTypeExtendedRef | ('DataEnumeration' DataEnumerationRef));
+DataAttributeTypeExtended: 'DataAttributeType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')? ;
+DataAttributeTypeExtendedRef: type= [DataAttributeTypeExtended | QualifiedName];
+DataAttributeTypeOriginal: type = (
+	'Integer' | 'Double' | 'Decimal' | 'Boolean' | 'Bit' | 'Currency' | 
+	'Date' | 'Time' | 'Datetime' | 
+	'String' | 'Text' | 'Regex' | 'URL' | 'Email'|
+	'File' | 'Image' | 'XML' | 'Binary' | 'FilePath'
+//	 | 'GeoPoint' | 'GeoPolyline' |'GeoPolygn' | 'GeoRaster' 
+	);
+
+ForeignKeyOnDeleteType: ForeignKeyOnDeleteTypeOriginal |ForeignKeyOnDeleteTypeExtendedRef;
+ForeignKeyOnDeleteTypeExtended: 'ForeignKeyOnDeleteType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ForeignKeyOnDeleteTypeExtendedRef: type= [ForeignKeyOnDeleteTypeExtended | QualifiedName];
+ForeignKeyOnDeleteTypeOriginal: type = ('CASCADE' | 'PROTECT' | 'SET_NULL' | 'SET_DEFAULT');
+
+/* 
+CASCADE: Cascade deletes. Emulates the behavior of the SQL constraint ON DELETE CASCADE and also deletes the object containing the ForeignKey.
+PROTECT: Prevent deletion of the referenced object by raising an Exception.
+SET_NULL: Set the ForeignKey null; this is only possible if null is True.
+SET_DEFAULT: Set the ForeignKey to its default value; a default for the ForeignKey must be set.
+ */
+ 
+StateMachineType: StateMachineTypeOriginal |StateMachineTypeExtendedRef;
+StateMachineTypeExtended: 'StateMachineType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StateMachineTypeExtendedRef: type= [StateMachineTypeExtended | QualifiedName];
+StateMachineTypeOriginal: type = ('Simple' | 'Complex');
+
+
+TestType: TestTypeOriginal |TestTypeExtendedRef;
+TestTypeExtended: 'TestType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+TestTypeExtendedRef: type= [TestTypeExtended | QualifiedName];
+TestTypeOriginal: type = ('Valid' | 'Invalid'); 
+
+TestScenarioType: TestScenarioTypeOriginal |TestScenarioTypeExtendedRef;
+TestScenarioTypeExtended: 'TestScenarioType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+TestScenarioTypeExtendedRef: type= [TestScenarioTypeExtended | QualifiedName];
+TestScenarioTypeOriginal: type = ('Main' | 'Alternative' | 'Exception');
+
+ScenarioType: ScenarioTypeOriginal |ScenarioTypeExtendedRef;
+ScenarioTypeExtended: 'ScenarioType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+ScenarioTypeExtendedRef: type= [ScenarioTypeExtended | QualifiedName];
+ScenarioTypeOriginal: type = (/*'Main' | */ 'Nested' | 'Alternative' | 'Exception');
+
+StepType: StepTypeOriginal |StepTypeExtendedRef;
+StepTypeExtended: 'StepType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StepTypeExtendedRef: type= [StepTypeExtended | QualifiedName];
+StepTypeOriginal: type = ('Actor' | 'System' | 'Other');	
+
+StepSubType: StepSubTypeOriginal |StepSubTypeExtendedRef;
+StepSubTypeExtended: 'StepSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StepSubTypeExtendedRef: type= [StepSubTypeExtended | QualifiedName];
+StepSubTypeOriginal: type = ('PrepareData' | 'CallSystem' | 'Execute' | 'ReturnResult' | 'Other');	
+//StepSubTypeOriginal: type = ('Actor_PrepareData' | 'Actor_CallSystem' | 'System_Execute' | 'System_ReturnResult' | 'Other');	
+
+StepSubSubType: StepSubSubTypeOriginal |StepSubSubTypeExtendedRef;
+StepSubSubTypeExtended: 'StepSubSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StepSubSubTypeExtendedRef: type= [StepSubSubTypeExtended | QualifiedName];
+StepSubSubTypeOriginal: type = ( 'SubmitAction' | 'ShowData' | 'CancelAction' | 'TerminateAction'| 
+								'OpenBrowser' | 'CloseBrowser' | 'Reload' | 'GetData' | 'PostData' | 
+								'Select' | 'Click' | 'Over' | 'Submit' | 'Fill' | 'Check' | 'Other');
+ 
+CheckType: CheckTypeOriginal |CheckTypeExtendedRef;
+CheckTypeExtended: 'CheckType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+CheckTypeExtendedRef: type= [CheckTypeExtended | QualifiedName];
+CheckTypeOriginal: type = ('TextOnScreen' | 'TextOnElement' | 'ElementOnScreen' | 'ResponseTime' | 'VariableValue' | 
+					'Script' | 'Screen' | 'Other' | 'None');
+
+VulnerabilityType: VulnerabilityTypeOriginal |VulnerabilityTypeExtendedRef;
+VulnerabilityTypeExtended: 'VulnerabilityType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+VulnerabilityTypeExtendedRef: type= [VulnerabilityTypeExtended | QualifiedName];
+VulnerabilityTypeOriginal: type = ('Business' | 'Project' | 'IT' | 'Other');
+
+VulnerabilitySubType: VulnerabilitySubTypeOriginal |VulnerabilitySubTypeExtendedRef;
+VulnerabilitySubTypeExtended: 'VulnerabilitySubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+VulnerabilitySubTypeExtendedRef: type= [VulnerabilitySubTypeExtended | QualifiedName];
+VulnerabilitySubTypeOriginal: type = (	
+	/* Based on the Common Vulnerability Scoring System (CVSS) (www.first.org/cvss/)  */
+	'IT_DoS' | 'IT_CodeExecution' | 'IT_Overflow' | 'IT_MemoryCorruption' | 'IT_SqlInjection' | 'IT_XSS' | 'IT_DirectoryTraversal' |
+	'IT_HttpResponseSplitting' | 'IT_BypassSomething' | 'IT_GainInformation' | 'IT_GainPrivileges' | 'IT_CSRF' | 'IT_FileInclusion' |
+	'Other');
+
+VulnerabilityAttackVector: VulnerabilityAttackVectorOriginal |VulnerabilityAttackVectorExtendedRef;
+VulnerabilityAttackVectorExtended: 'VulnerabilityAttackVector' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+VulnerabilityAttackVectorExtendedRef: type= [VulnerabilityAttackVectorExtended | QualifiedName];
+VulnerabilityAttackVectorOriginal: type = ('IT_Network' | 'IT_AdjacentNetwork' | 'IT_Local' | 'IT_Physical' | 'IT_Other');
+
+
+RiskType: RiskTypeOriginal |RiskTypeExtendedRef;
+RiskTypeExtended: 'RiskType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+RiskTypeExtendedRef: type= [RiskTypeExtended | QualifiedName];
+RiskTypeOriginal: type = ('Business' | 'Project' | 'IT' | 'Other');
+
+RiskSubType: RiskSubTypeOriginal |RiskSubTypeExtendedRef;
+RiskSubTypeExtended: 'RiskSubType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+RiskSubTypeExtendedRef: type= [RiskSubTypeExtended | QualifiedName];
+RiskSubTypeOriginal: type = (
+	'Business_Strategic' | 'Business_Compliance' | 'Business_Operational' | 'Business_Financial' | 
+	'Project_Schedule' | 'Project_Budget' | 'Project_Scope' | 'Project_Resource' | 'Project_Quality' | 
+	/*  Based on the STRIDE threat model (msdn.microsoft.com/en-us/library/ee823878(v=cs.20).aspx) */
+	'IT_Spoofing' | 'IT_Tampering' | 'IT_Repudiation' | 'IT_InformationDisclosure' | 'IT_DenialOfService' | 'IT_ElevationOfPrivilege' | 
+	'Other');
+	
+RiskTreatmentType: RiskTreatmentTypeOriginal |RiskTreatmentTypeExtendedRef;
+RiskTreatmentTypeExtended: 'RiskTreatmentType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+RiskTreatmentTypeExtendedRef: type= [RiskTreatmentTypeExtended | QualifiedName];
+RiskTreatmentTypeOriginal: type = ('Avoid' | 'Transfer' | 'Mitigate' | 'Accept');
+
+RiskStatus: type = ('Identified' | 'Assessed' | 'Planned' | 'OnProcess' | 'Closed' | 'NotOccurred' | 'Rejected');
+
+
+RelationType: RelationTypeOriginal |RelationTypeExtendedRef;
+RelationTypeExtended: 'RelationType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+RelationTypeExtendedRef: type= [RelationTypeExtended | QualifiedName];
+RelationTypeOriginal: type = ('Requires' | 'Supports' | 'Obstructs' | 'Conflicts' | 'Identical' | 'Relates' | 'Other');
+ElementsRelationType: type = ('Requires' | 'Supports' | 'Obstructs' | 'Conflicts' | 'Identical' | 'Relates' | 'Other');
+
+SystemsRelationType: SystemsRelationTypeOriginal |SystemsRelationTypeExtendedRef;
+SystemsRelationTypeExtended: 'SystemsRelationType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+SystemsRelationTypeExtendedRef: type= [SystemsRelationTypeExtended | QualifiedName];
+SystemsRelationTypeOriginal: type = ('Requires' | 'Supports' | 'Obstructs' | 'Conflicts' | 'Identical' | 'Relates' | 'Other');
+
+SystemsRelationCategory: SystemsRelationCategoryOriginal |SystemsRelationCategoryExtendedRef;
+SystemsRelationCategoryExtended: 'SystemsRelationCategory' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+SystemsRelationCategoryExtendedRef: type= [SystemsRelationCategoryExtended | QualifiedName];
+SystemsRelationCategoryOriginal: type = ('Import' | 'Export' | 'ImportExport' | 'Sync' | 'Interact' | 'Other');
+
+RequirementsRelationType: RequirementsRelationTypeOriginal |RequirementsRelationTypeExtendedRef;
+RequirementsRelationTypeExtended: 'RequirementsRelationType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+RequirementsRelationTypeExtendedRef: type= [RequirementsRelationTypeExtended | QualifiedName];
+RequirementsRelationTypeOriginal: type = ('Requires' | 'Supports' | 'Obstructs' | 'Conflicts' | 'Identical' | 'Relates' | 'IsSolution' | 'Other');
+
+TestsRelationType: TestsRelationTypeOriginal |TestsRelationTypeExtendedRef;
+TestsRelationTypeExtended: 'TestsRelationType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+TestsRelationTypeExtendedRef: type= [TestsRelationTypeExtended | QualifiedName];
+TestsRelationTypeOriginal: type = ('Requires' | 'Supports' | 'Obstructs' | 'Conflicts' | 'Identical' | 'Relates' | 'Other');
+
+
+StereotypeType: StereotypeTypeOriginal | StereotypeTypeExtendedRef;
+StereotypeTypeExtended: 'StereotypeType' name=ID  (nameAlias=STRING)? ('['('description' description=STRING)? ']')?;
+StereotypeTypeExtendedRef: type= [StereotypeTypeExtended | QualifiedName];
+StereotypeTypeOriginal: type = (
+	'System' | 
+	'GlossaryTerm' | 
+	'Stakeholder' | 'Actor' | 
+	'ActiveTask' | 'ActiveEvent' |
+	'Goal' | 'QR' | 'FR' | 'Constraint' | 'UserStory' | 'UseCase' | 
+	'AcceptanceCriteriaTestView' | 'UseCaseTestView' | 'DataEntityTestView' | 'StatemachineTestView' |
+	'DataEntity' | 'DataEntityCluster' | 'StateMachine' | 
+	'Vulnerability' | 'Risk' |
+	'Other');
+
+
+ViewType: type = (
+	'RequirementView' | 'GoalView' | 'QRView' | 'FRView' | 'ConstraintView' | 'UserStoryView' | 'UseCaseView' |
+	'TestView' |
+	'StakeholderView' | 'ActorView' |
+	'GlossaryTermView' | 
+	'DataEntityView' | 'DataEntityClusterView' |
+	'ActiveElementView' |
+	'RiskView' | 'VulnerabilityView');
+
+ThemeType: type = (	
+	'SystemElementTheme' | 'StructureElementTheme' | 'BehaviorElementTheme' | 'RequirementTheme' | 'TestTheme' | 'OtherTheme');	
+
+IncludeSystemElementType: type = (
+	'Goal' | 'QR' | 'FR' | 'Constraint' | 'UserStory' | 'UseCase' |
+	'AcceptanceCriteriaTestView' | 'UseCaseTestView' | 'DataEntityTestView' | 'StatemachineTestView' |
+	'Stakeholder' | 'Actor' | 
+	'GlossaryTerm' | 'DataEnumeration' |
+	'DataEntity' | 'DataEntityCluster' | 
+	'StateMachine' | 
+	'ActiveEvent' | 'ActiveTask' | 'ActiveFlow' |
+	'Vulnerability' | 'Risk');
+
+
+//*******************************************************************************	
+GlossaryTerm:
+	'Term' name=ID  (nameAlias=STRING)?  ':' type=GlossaryTermType  ('['
+		('isA' super=[GlossaryTerm | QualifiedName] )? 
+		('partOf' ('optional' | 'mandatory')? partOf=[GlossaryTerm | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('acronym' acronym=STRING)? 
+		('applicableTo' applicableTo= RefTermApplicableTo)? 
+		('synonym' synonym=STRING)? 
+								 
+		(tags+=Tag)*
+		('description' description=STRING)?	
+	']')?;
+
+RefTermApplicableTo: refs+=TermApplicableTo (',' refs+=TermApplicableTo)*;	
+	
+//*******************************************************************************	
+Stakeholder:
+	'Stakeholder' name=ID  (nameAlias=STRING)? ':' type=StakeholderType (':' subType=StakeholderSubType)?  ('['
+		('isA' super=[Stakeholder | QualifiedName] )? 
+		('partOf' ('optional' | 'mandatory')? partOf=[Stakeholder | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+
+//*******************************************************************************	
+ActiveElement:
+	ActiveEvent | ActiveTask | ActiveFlow ;
+
+RefActiveElement:
+	refActiveElement+=[ActiveElement | QualifiedName] (',' refActiveElement+=[ActiveElement | QualifiedName] )+ ;
+	 
+ActiveEvent:
+	'Event' name=ID  (nameAlias=STRING)? ':' type=ActiveEventType ('['
+		(isInitial ?= 'isInitial')? 
+		(isFinal ?= 'isFinal')? 
+		('participant' stakeholder=[Stakeholder | QualifiedName] )?
+		(tags+=Tag)*
+		('description' description=STRING)?  ']')?;
+
+ActiveTask:
+	'Task' name=ID  (nameAlias=STRING)? ':' type=ActiveTaskType ('['
+		('partOf' ('optional' | 'mandatory')? partOf=[ActiveTask | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('participant' participant=[Stakeholder | QualifiedName] )?
+		('participantExternal' participantTarget=[Stakeholder | QualifiedName] )?  // only for Send or Receive BPType
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+ActiveFlow:
+	'TaskFlow' name=ID  (nameAlias=STRING)?   ':' type=ActiveFlowType ('['
+		('condition' condition=STRING)?   // only if type SequenceConditional
+		'activeElements' activeElements=RefActiveElement
+		(tags+=Tag)*
+		('description' description=STRING)?  ']')?;
+
+
+//*******************************************************************************	
+DataEntity:  
+	'DataEntity' name=ID  (nameAlias=STRING)? ':' type=DataEntityType (':' subType=DataEntitySubType)? ('['
+		('isA' super=[DataEntity | QualifiedName] )?
+		(attributes+=DataAttribute)*
+		(constraint= DataEntityConstraint)?
+
+		(tags+=Tag)*
+		('description' description=STRING)? ']')?;
+
+
+//*******************************************************************************	
+DataAttribute:
+	'attribute' name=ID  (nameAlias=STRING)?  ':' type=DataAttributeType  ('['
+//	'attribute' name=ID  (nameAlias=STRING)?  ':' type=DataAttributeType  ('['
+		('defaultValue' defaultValue=STRING)? 
+		('values' values=STRING)? 
+
+	//new 2020/05
+		('visualization' visualizatione=STRING)? 
+		('helpMessage' helpMessage=STRING)? 
+
+		(constraint= DataAttributeConstraint)?
+		(tags+=Tag)*
+		('description' description=STRING)? ']')?;
+
+
+DataAttributeRefsList :
+	(attributeRef += [DataAttribute | QualifiedName]) (',' attributeRef += [DataAttribute | QualifiedName])* ;
+
+
+DataEntityConstraint: {DataEntityConstraint}
+	'constraints' '('
+		(isReadOnly='ReadOnly')?   // is false by default
+		(isEncrypted='Encrypted')?   // is false by default
+		('showAs' '(' showAsAttribute= [DataAttribute | QualifiedName] ')')?  //new
+		(checks+=Check)*
+	')';
+
+
+ 
+DataAttributeConstraint: {DataAttributeConstraint} 
+	'constraints' '('
+		('multiplicity' multiplicity=Multiplicity)? 
+
+		(isPrimaryKey='PrimaryKey')? 			// is false by default
+		(isNotNull='NotNull')? 					// is false by default
+		(isUnique='Unique')?   					// is false by default
+		(isDerived='Derived' ( '(' expression=STRING  ')' )? )?   		
+		(isReadOnly='ReadOnly')?   				// is false by default
+		(isNotVisible='NotVisible')? 			// is false by default
+		(isEncrypted='Encrypted')?   			// is false by default
+		(foreignKey=ForeignKey)? 	
+		(manyToMany=ManyToMany)? 	
+		(checks+=Check)*
+	')';
+
+//** DataEnumeration
+DataEnumeration: 
+	'DataEnumeration' name=ID  (nameAlias=STRING)? 
+		'values' '(' values+= STRING (',' values+=STRING)* ')' ('['
+		(tags+=Tag)*
+		('description' description=STRING)? ']')?;
+
+DataEnumerationRef: type= [DataEnumeration | QualifiedName];
+
+//*******************************************************************************	
+Data:  
+	'Data' name=ID  (nameAlias=STRING)? ':' type=[DataEntityGeneric | QualifiedName]  ('['
+		('withValues' table= DataAttributeValues)?
+		(tags+=Tag)*
+		('description' description=STRING)? 
+	']')?; 
+	
+	
+DataAttributeValues:
+	(tableHeader = DataAttributeRefs)
+//	('|' attributeRefs += [DataAttribute | QualifiedName])+
+	tableRows += DataAttributeTableRow*;
+
+DataAttributeRefs :
+	('|' attributeRef += [DataAttribute | QualifiedName])+ "+|";
+
+DataAttributeTableRow:
+	('|' attributeValues += AttributeValue)+ "+|";
+	
+			
+//*******************************************************************************	
+//PrimaryKey:
+//	'PrimaryKey' '(' refTo=RefDataAttribute ')';
+
+ForeignKey:
+	'ForeignKey' '(' targetEntity=[DataEntity | QualifiedName]  
+		('toField' toField= [DataAttribute | QualifiedName])? 
+		('showAsField' showAsField= [DataAttribute | QualifiedName] )?
+		('defaultValue' defaultValue=STRING)? 
+		('onDelete' onDelete= ForeignKeyOnDeleteType )?
+	')' ;
+
+
+
+//ForeignKeyAttribute:
+//	'ForeignKey' fentity=[DataEntity | QualifiedName] ('showAs' showAs= [DataAttribute | QualifiedName] )?;
+
+ManyToMany:
+	'ManyToMany' '(' targetEntity=[DataEntity | QualifiedName] 
+		('throughEntity' throughEntity=[DataEntity | QualifiedName] )? 
+		('throughSourceField' throughSourceField=[DataAttribute | QualifiedName] )? 
+		('throughTargetField' throughTargetField=[DataAttribute | QualifiedName] )?
+	')' ;		
+
+
+//RefDataAttribute:
+//	refAttr+=[DataAttribute](',' refAttr+=[DataAttribute])* ;
+
+Check:
+	'Check' '(' name=ID  checkExpression=STRING ')';
+
+//*******************************************************************************	
+DataEntityCluster:  
+'DataEntityCluster' name=ID  (nameAlias=STRING)?  ':' type=DataEntityClusterType ('['
+	('main' main= [DataEntity | QualifiedName])
+	(children += ChildDataEntity)*
+//	('child' children+= [DataEntity | QualifiedName]  ('[' 'uses' childrenUses+=RefDataEntity ']')? )*
+	('uses' uses= RefDataEntity)?
+	(tags+=Tag)*
+	('description' description=STRING)? ']' )?;
+
+ChildDataEntity:
+	'child' child = [DataEntity | QualifiedName]  ('[' 'uses' childUses =RefDataEntity ']')?;
+
+/* 
+MainDEntity:
+	'main' mainDEntity= [DataEntity | QualifiedName] ;
+	
+ChildDataEntity:
+	'child' dEntityDetail= [DataEntity | QualifiedName]  ('[' 'uses' refDEntity=RefDEntity ']')?;
+	
+ReferenceDEntity:
+	'uses' refDEntity= RefDEntity;
+
+*/
+RefDataEntity:
+	refDataEntity+=[DataEntity | QualifiedName]  (',' refDataEntity+=[DataEntity | QualifiedName] )* ;
+ 
+ 
+//*******************************************************************************	
+Actor:
+	'Actor' name=ID  (nameAlias=STRING)?  ':' type=ActorType ('['
+		('isA' super=[Actor | QualifiedName] )?
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+		(tags+=Tag)*
+		('description' description=STRING)? ']')?;
+ 
+	 
+/*******************************************************************************
+ * System-related Rule(s): Requirements: Goal | FR | QR | Constraint | UserStory | UseCase
+********************************************************************************/
+
+Requirement:
+	Goal | FR | QR | Constraint | UserStory | UseCase;
+ 	
+//*******************************************************************************	
+Goal:
+	'Goal' name=ID  (nameAlias=STRING)?  ':' type=GoalType (':' subType=GoalSubType)? ('[' 
+		((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+		('partOf' ('optional' | 'mandatory')? partOf=[Goal | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+
+		(acceptanceCriteria+= AcceptanceCriteria)* 
+
+		('priority' priority=PriorityType)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?; 
+
+//*******************************************************************************
+FR:
+	'FR' name=ID  (nameAlias=STRING)?  ':' type=FRType ('['
+		((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+		('partOf' ('optional' | 'mandatory')? partOf=[FR | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+
+		(acceptanceCriteria+= AcceptanceCriteria)*
+
+		('priority' priority=PriorityType)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+//*******************************************************************************	
+QR:
+	'QR' name=ID  (nameAlias=STRING)? ':' type=QRType (':' subType=QRSubType)? ('['
+		((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+						   		
+		(expression = Expression)?
+		
+		//('value' value=DoubleOrInt)?
+		//('metric' metric=Metric)?
+		('partOf' ('optional' | 'mandatory')? partOf=[QR | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+
+		(acceptanceCriteria+= AcceptanceCriteria)*
+
+		('priority' priority=PriorityType)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+
+//*******************************************************************************
+Constraint:
+	'Constraint'name=ID  (nameAlias=STRING)?  ':' type=ConstraintType (':' subType=ConstraintSubType)? ('['
+		((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+		('partOf' ('optional' | 'mandatory')? partOf=[Constraint | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+
+		(acceptanceCriteria+= AcceptanceCriteria)*
+
+		('priority' priority=PriorityType)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+//*******************************************************************************
+// As a <type of user>, I want <goal> so that I <receive benefit>.
+// As a <actor>, I want <goal> so that  <receive benefit>.
+UserStory:
+  'UserStory' name=ID  (nameAlias=STRING)?  ':' type=UserStoryType ('['
+	((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+	((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+	((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+	('partOf' ('optional' | 'mandatory')? partOf=[UserStory | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+	('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+
+//	('asA' ((actor=[Actor | QualifiedName] ) | (stakeholder=[Stakeholder | QualifiedName] )))
+	('asA' ((actor=[Actor | QualifiedName] ) | (otherRole=STRING)))
+	('iWant' goal=STRING)
+	('soThat' reason=STRING)?
+
+	(acceptanceCriteria+= AcceptanceCriteria)*
+
+	('priority' priority=PriorityType)?
+	(tags+=Tag)*
+	('description' description=STRING)?
+']')?;
+
+	  
+//*******************************************************************************
+UseCase:
+	'UseCase' name=ID  (nameAlias=STRING)?  ':' type=UseCaseType ('['
+		((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+		('stakeholder' stakeholder=[Stakeholder | QualifiedName] )?
+		
+//		('actorInitiates' actorInitiates=[Actor | QualifiedName] )
+		('primaryActor' primaryActor=[Actor | QualifiedName] )
+		('supportingActors' supportingActors+=RefActor)?
+		('triggeredBy' triggeredBy=[ActiveEvent | QualifiedName])? // by default a UC is triggered by its PrimaryActor
+
+		('dataEntity' dataEntity=[DataEntityGeneric | QualifiedName] )?
+
+		('precondition' precondition=STRING)?
+		('postcondition' postcondition=STRING)?
+		
+		(actions= UCActions)?
+		(extensionPoints= UCExtensionPoints)? 
+				
+		(includes= UCIncludes)?
+		(extends+= UCExtends)*
+
+		(acceptanceCriteria+= AcceptanceCriteria)*
+
+		('priority' priority=PriorityType)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+		
+		(mainScenarios+=MainScenario)*
+	']')?;
+	
+
+RefActor:
+	refs+=[Actor | QualifiedName] (',' refs+=[Actor | QualifiedName] )*;
+
+// UseCaseTriggeredBy:
+//	'triggeredBy'  type=ActiveEventType "Event" (expression=STRING)? ;
+	
+UCActions: 
+	'actions' actions+= ActionType  (',' actions+=ActionType)*;
+//	'actions' actions+= [ActionType | QualifiedName] (',' actions+=[ActionType | QualifiedName])*;
+
+/* 
+ActionStandardType: value = (	'aCreate'|'aRead'|'aUpdate'|'aDelete'|
+								'aSearch'|'aFilter'|'aSort'| 
+								'aPrint'|'aSend'|'aImport'|'aExport'|'aAnalyse'|
+								'aReadFirst'|'aReadPrevious'|'aReadNext'|'aReadLast'|
+								'aClose'| 'aCancel' | 'aConfirm'|
+								'aGeoZoomIn'| 'aGeoZoomOut'
+								);
+*/	
+
+	
+UCIncludes:
+	'includes' includes+=RefUC;	
+	
+UCExtends:
+	'extends' usecase=[UseCase | QualifiedName]  'onExtensionPoint' extensionPoint=[UCExtensionPoint | QualifiedName];	
+	
+UCExtensionPoints:
+	'extensionPoints' extensionPoints+= UCExtensionPoint (',' extensionPoints+=UCExtensionPoint)*;
+	
+UCExtensionPoint: 
+	name=ID ('[' description=STRING ']' )?; 
+
+RefUC:
+	refs+=[UseCase | QualifiedName] (',' refs+=[UseCase | QualifiedName] )*;
+	
+
+MainScenario:
+	'mainScenario' name=ID '(' 'Main' ')' (nameAlias=STRING)?  ('['
+		('description' description=STRING)?  
+		(steps+=Step)*   
+	']')?;
+
+
+StepOperationUCType: type = ('extendedBy' | 'include');
+	
+Step:
+'step' name=ID 
+    
+	( ( '(' (type=StepType (':' subType=StepSubType (':' subSubType=StepSubSubType )? )?  ) ')'	(nameAlias=STRING))  
+	  |
+	  ( ('<' typeUC=StepOperationUCType) (usecase= [UseCase | QualifiedName]) '>' (nameAlias=STRING)? )
+	)
+
+	('actor' actor=[Actor | QualifiedName] )?
+	('repeat' repeat=STRING)?
+	('description' description=STRING)?
+	('nextStep' next=[Step | QualifiedName])?
+	('[' (scenarios += Scenario)* ']' )?
+	;
+	
+
+Scenario:
+	'scenario' name=ID  '(' type=ScenarioType ')' (nameAlias=STRING)  ('repeat' repeat=STRING)? ('['
+	    
+		('description' description=STRING)?  
+		( steps+=Step )*   
+	']')?;
+		
+		
+/* 	
+//	SimpleStep | CompoundStep;
+	
+	
+	 
+	'step' name=ID ':' type=StepType (':' subType=StepSubType )?'['
+//		(simpleStep= SimpleStep | subSteps+= Step+ | ifSteps+= IfStep* | repeatSteps+= RepeatStep*)
+		(simpleStep= SimpleStep | compoundSteps+= CompoundStep+)
+	']';
+
+
+SimpleStep:
+{SimpleStep}
+'step' name=ID ':' type=StepType (':' subType=StepSubType )? 
+	(nameAlias=STRING)
+	('actor' actor=[Actor | QualifiedName] )?
+	('description' description=STRING)?
+	('precondition' precondition=STRING)?
+	('postcondition' postcondition=STRING)?
+	('nextStep' next=[Step])?;
+
+CompoundStep:
+{CompoundStep}
+	(nameAlias=STRING)?
+	(ifSteps+= IfStep* | repeatSteps+= RepeatStep*)
+	;
+
+* 
+*/
+
+
+/* 
+
+IfStep:
+	'if' 
+		(('action' action=ActionType)  | (condition= STRING ) )
+	'['
+		steps+= Step+
+	']';
+	
+RepeatStep:
+	'repeat' 
+		(condition= STRING)
+	'['
+		steps+= Step+
+	']';
+
+* 
+*/
+
+ConditionalExpression:
+	IfExpression | RepeatExpression
+	;		
+
+IfExpression:
+	'if' '(' ('action' action=ActionType)  | (condition= STRING) ')' ;
+	
+RepeatExpression:
+	'repeat' '(' (condition= STRING) ')';
+
+
+/********************************************************
+   Entities' State Machines
+*********************************************************/
+
+StateMachine:
+	'StateMachine' name=ID  (nameAlias=STRING)?  ':' type=StateMachineType ('['
+		'dataEntity' entity= [DataEntityGeneric | QualifiedName] 
+		(tags+=Tag)*
+		('description' description=STRING)?
+		states= States ']')?;
+
+States:
+	{State} states += State*;
+	
+State:
+	'state'name=ID  (nameAlias=STRING)?  
+	(isInitial ?= 'isInitial')? 
+	(isFinal ?= 'isFinal')? 
+	('onEntry' onEntry= STRING)?
+	('onExit' onExit= STRING)?
+	(':' (transitions+= Transition))? (transitions+= Transition)* ;
+		
+Transition:
+	(ucAction= RefUCAction ('nextState' nextstate= [State])?);
+	
+RefUCAction:
+	'useCase' useCase=[UseCase | QualifiedName]  'action' action= ActionType;
+//	'useCase' useCase=[UseCase | QualifiedName]  'action' action= [ActionType | QualifiedName];
+
+
+
+/********************************************************************************
+ * Test-related Rule(s)
+*********************************************************************************/
+
+//*******************************************************************************	
+ AcceptanceCriteria:
+	'acceptanceCriteria' name=ID  (nameAlias=STRING)?  ':' type=TestType ('['
+		//((isNegative ?= 'isNegative') | (isPositive ?= 'isPositive'))?  // if not defined "isPositive" by default
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		//((isSolution ?= 'isSolution') | (isProblem ?= 'isProblem'))?  // if not defined "isProblem" by default
+
+		( criteriaS= AcceptanceCriteriaScenario | criteriaR= AcceptanceCriteriaRule)
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')? ;
+
+ 
+
+//*******************************************************************************	
+Test:
+	AcceptanceCriteriaTest | DataEntityTest | UseCaseTest | StateMachineTest;
+
+
+//*******************************************************************************	
+AcceptanceCriteriaTest:
+	'AcceptanceCriteriaTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('['
+		('requirement' requirement=[Requirement | QualifiedName] )
+		( criteriaS= AcceptanceCriteriaScenario | criteriaR= AcceptanceCriteriaRule)
+		(tags+=Tag)*
+		('description' description=STRING)? 
+	']')? ; 
+
+ AcceptanceCriteriaScenario:
+ 	'scenario'  scenario=STRING
+  		('given' given+=STRING (('given' | 'and') given+=STRING)* )?
+ 		('when' when+=STRING (('when' | 'and') when+=STRING)* )?
+ 		('then' then+=STRING (('then' | 'and' | 'but') then+=STRING)* )?  ;
+ 	
+ 
+ AcceptanceCriteriaRule:
+ 	'rule' rule=STRING; 
+ 
+ //*******************************************************************************	
+DataEntityTest:
+	'DataEntityTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('['
+		'dataEntity' entity= [DataEntity | QualifiedName]  
+		('withValues' table= DataAttributeValues )?
+		(testDataAttributes+=TestDataAttribute)*
+		('message' message=STRING)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?; 
+
+TestDataAttribute:
+	'testAttribute' attribute= [DataAttribute | QualifiedName] '(' 
+		('partitionClass'  type=DataAttributeType )?
+		('values' values=STRING)? 
+		('message' message=STRING)?
+
+	')';
+
+/* 
+DataAttributeValues:
+	(tableHeader = DataAttributeRefs)
+//	('|' attributeRefs += [DataAttribute | QualifiedName])+
+	tableRows += DataAttributeTableRow*;
+
+DataAttributeRefs :
+	('|' attributeRef += [DataAttribute | QualifiedName])+ "+|";
+
+DataAttributeTableRow:
+	('|' attributeValues += AttributeValue)+ "+|";
+
+* 
+*/
+
+//DataAttributeRefsList :
+//	(attributeRef += [DataAttribute | QualifiedName]) (',' attributeRef += [DataAttribute | QualifiedName])* ;
+	
+//*******************************************************************************	
+StateMachineTest:
+	'StateMachineTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('['
+		//('dataEntity' entity=[DataEntity | QualifiedName] )?
+		'stateMachine' stateMachine=[StateMachine | QualifiedName] 
+		stateSequence= StateSequence
+		//testStates+= TestState+
+		('message' message=STRING)?
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+StateSequence:
+	'stateSequence' refState+=[State | QualifiedName](',' refState+=[State | QualifiedName])*;
+	//'testState' refState+=[State | QualifiedName](',' refState+=[Step | QualifiedName])*;
+
+/* 
+ * 
+
+//*******************************************************************************	
+UseCaseTest:
+	'UseCaseTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('[' 
+		'useCase' useCase=[UseCase | QualifiedName] 
+		('actorInitiates' actorInitiates=[Actor | QualifiedName] )
+		('actorParticipates' actorParticipates+=RefActor)?
+		//('dataEntity' entity=[DataEntity | QualifiedName] )?
+		(tags+=Tag)*
+		('description' description=STRING)?
+		
+		('background' background=[UseCaseTest | QualifiedName] )?
+		(scenarios+=TestScenario)*
+	']')?;
+
+TestScenario:
+	'testScenario' name=ID  (nameAlias=STRING)?  ':' type=ScenarioType ('[' 
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		('executionMode' mode=('Sequential'|'Parallel'))?
+		('description' description=STRING)? 
+		testSteps+= TestStep+
+		']')?;
+
+TestStep:
+	'testStep' name=ID ':' type=StepType (':' subType=StepSubType )? ('['
+		(simpleTestStep= SimpleTestStep )
+	']')?;
+
+SimpleTestStep:
+	(nameAlias=STRING)
+	('actor' actor=[Actor | QualifiedName] )?
+	('description' description=STRING)?
+	('dataEntity' entity= [DataEntity | QualifiedName]  ('withValues' '(' table= DataAttributeValues ')'))?
+	('precondition' precondition=STRING)?
+	('postcondition' postcondition=STRING)?
+	('nextStep' next=[TestStep])?;
+
+* 
+
+//ADICIONADO 'variables'
+UseCaseTest:
+	'UseCaseTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('[' 
+		'useCase' useCase=[UseCase | QualifiedName] 
+		('actorInitiates' actorInitiates=[Actor | QualifiedName] )
+		('actorParticipates' actorParticipates+=RefActor)?
+		//('dataEntity' entity=[DataEntity | QualifiedName] )?
+		(tags+=Tag)*
+		('description' description=STRING)?
+		(variables+=TestVariable)*
+		('background' background=[UseCaseTest | QualifiedName] )?
+		(scenarios+=TestScenario)*
+	']')?;
+
+//ADICIONADO 'dataVariale' E 'dataEntity' PARA PERMITIR REUTILIZACAO DE DADOS
+TestScenario:
+	'testScenario' name=ID  (nameAlias=STRING)?  ':' type=ScenarioType ('[' 
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		('variable'variable= [TestVariable | QualifiedName]  ('withValues' '(' variableTable= DataVariableValues ')'))?
+		('dataEntity' entity= [DataEntity | QualifiedName]  ('withValues' '(' entityTable= DataAttributeValues ')'))?
+		('executionMode' mode=('Sequential'|'Parallel'))?
+		('description' description=STRING)? 
+		testSteps+= TestStep+
+		']')?;
+
+TestStep:
+	'step' name=ID ':' type=StepType (':' extension=OperationExtension)?  ('['
+		(simpleTestStep= SimpleTestStep )
+	']')?;
+	
+	
+//NEW	
+
+
+OperationExtension:
+	(subType=StepSubType)
+	((target=TestOperationTarget)|(check=TestCheck))?
+;
+
+TestOperationTarget:
+	(type=OperationTargetType)
+	((variable+=[DataAttribute | QualifiedName]  (','variable+=[DataAttribute | QualifiedName] )*)|
+	('(' content+=(STRING)  (','content+=STRING)* ')'))?
+	//('(' content+=([DataAttribute | QualifiedName]|STRING)  (','content+=([DataAttribute | QualifiedName]|STRING))* ')'))?
+;
+
+enum OperationTargetType : button | element | checkbox | listByValue | readFrom | writeTo;
+
+//TRANSFERIDO O 'DataEntity' DO 'SimpleTestStep' PARA O 'TestScenario' PARA PERMITIR REUTLIZACAO
+SimpleTestStep:
+	(nameAlias=STRING)
+	('actor' actor=[Actor | QualifiedName] )?
+	('description' description=STRING)?
+	('precondition' precondition=STRING)? 
+	('postcondition' postcondition=STRING)?
+	('nextStep' next=[TestStep])?;
+
+TestVariable:  
+	'variable' name=ID  (nameAlias=STRING)? ('['
+		(attributes+=DataAttribute)+
+		('description' description=STRING)? ']')?;		
+		
+DataVariableValues:
+	(tableHeader = DataVariableRefs)
+	tableRows += DataVariableTableRow*;
+
+DataVariableRefs :
+	('|' variableRef += [DataAttribute | QualifiedName])+ "+|";
+
+
+DataVariableTableRow:
+	{DataVariableTableRow} ('|' (variableValues += STRING)?)+ "+|";
+
+TestCheck:
+	 (type=CheckType) ('('
+	 (variable=[DataAttribute | QualifiedName] '=' expected=[DataAttribute | QualifiedName])?
+	 ('text' (textVariable=[DataAttribute | QualifiedName]| textString=STRING))?
+	 ('timeout' (timeoutVariable=[DataAttribute | QualifiedName]| timeoutINT=DoubleOrInt) metric=Metric?)?
+	 ('limit' (limitVariable=[DataAttribute | QualifiedName]| limitINT=INT))?
+	 ('url' (urlVariable=[DataAttribute | QualifiedName]| urlString=STRING))?
+	 ('code' (codeVariable=[DataAttribute | QualifiedName]| codeString=STRING))?
+	 ')');
+
+enum CheckType: textOnScreen | textOnElement | elementOnScreen | responseTime | variableValue | script | screen | Other | None;
+* 
+* 
+***/
+
+//*******************************************************************************	
+//ADICIONADO 'variables'
+UseCaseTest:
+	'UseCaseTest' name=ID  (nameAlias=STRING)?  ':' type=TestType ('[' 
+		'useCase' useCase=[UseCase | QualifiedName] 
+//		('primaryActor' primaryActor=[Actor | QualifiedName] )
+//		('supportingActors' supportingActors+=RefActor)?
+				
+		(tags+=Tag)*
+		('description' description=STRING)?
+		(variables+=TestVariable)*
+//		('background' background=[UseCaseTest | QualifiedName] )?
+
+		(scenarios+=TestScenario)*
+	']')?;
+
+
+//ADICIONADO 'dataVariale' E 'dataEntity' PARA PERMITIR REUTILIZACAO DE DADOS
+TestScenario:
+	'testScenario' name=ID  (nameAlias=STRING)?  ':' type=TestScenarioType ('[' 
+		((isConcrete ?= 'isConcrete') | (isAbstract ?= 'isAbstract'))?  // if not defined "isAbstract" by default
+		
+		('variable'variable= [TestVariable | QualifiedName]  ('withValues' variableTable= DataVariableValues ))?
+		('dataEntity' entity= [DataEntity | QualifiedName]  ('withValues'  entityTable= DataAttributeValues ))?
+		('description' description=STRING)? 
+		(testSteps+= TestStep)*
+		']')?;
+
+
+
+
+
+
+
+TestStep:
+'step' name=ID
+    ( '(' (type=StepType (':' extension=OperationExtension)?  ) ')'	(nameAlias=STRING))
+	('actor' actor=[Actor | QualifiedName] )?
+	('repeat' repeat=STRING)?
+	('description' description=STRING)?
+	('nextStep' next=[Step | QualifiedName])?
+	;
+
+     
+/*      	
+	 ':' type=StepType (':' extension=OperationExtension)?  ('['
+		(simpleTestStep= SimpleTestStep )
+	 ']')?;
+*/	
+	 
+//NEW	
+OperationExtension:
+	(subSubType=StepSubSubType)
+	((target=TestOperationTarget)|(check=TestCheck))?
+;
+
+TestOperationTarget:
+	(type=OperationTargetType)
+	((variable+=[DataAttribute | QualifiedName]  (','variable+=[DataAttribute | QualifiedName] )*)|
+	('(' content+=(STRING)  (','content+=STRING)* ')'))?;
+
+enum OperationTargetType : button | element | checkbox | listByValue | readFrom | writeTo;
+
+//TRANSFERIDO O 'DataEntity' DO 'SimpleTestStep' PARA O 'TestScenario' PARA PERMITIR REUTLIZACAO
+SimpleTestStep:
+	(nameAlias=STRING)
+	('actor' actor=[Actor | QualifiedName] )?
+	('description' description=STRING)?
+	('precondition' precondition=STRING)?
+	('postcondition' postcondition=STRING)?
+	('nextStep' next=[TestStep])?;
+
+TestVariable:  
+	'variable' name=ID  (nameAlias=STRING)? ('['
+		(attributes+=DataAttribute)+
+		('description' description=STRING)? ']')?;		
+		
+DataVariableValues:
+	(tableHeader = DataVariableRefs)
+	tableRows += DataVariableTableRow*;
+
+DataVariableRefs :
+	('|' variableRef += [DataAttribute | QualifiedName])+ "+|";
+
+
+DataVariableTableRow:
+	{DataVariableTableRow} ('|' (variableValues += STRING)?)+ "+|";
+
+//'CheckType' DEFINIDO JUNTAMENTE COM OS OUTROS 'ENUM'		
+TestCheck:
+	 (type=CheckType) ('('
+	 (variable=[DataAttribute | QualifiedName] '=' expected=[DataAttribute | QualifiedName])?
+	 ('text' (textVariable=[DataAttribute | QualifiedName]| textString=STRING))?
+	 ('timeout' (timeoutVariable=[DataAttribute | QualifiedName]| timeoutINT=DoubleOrInt) metric=MetricType?)?
+	 ('limit' (limitVariable=[DataAttribute | QualifiedName]| limitINT=INT))?
+	 ('url' (urlVariable=[DataAttribute | QualifiedName]| urlString=STRING))?
+	 ('code' (codeVariable=[DataAttribute | QualifiedName]| codeString=STRING))?
+	 ')');
+
+
+
+
+/********************************************************
+ * Security-specific concerns
+ * 
+ * + Vulnerability
+ * + Risk/Threat  (with RiskTreatment + Refs to Vulnerabilities + )
+ ********************************************************/
+
+//*******************************************************************************
+Vulnerability:
+	'Vulnerability' name=ID  (nameAlias=STRING)?  ':' type=VulnerabilityType (':' subType=VulnerabilitySubType)? ('['
+		('isA' super=[Vulnerability | QualifiedName])?
+		('partOf' ('optional' | 'mandatory')? partOf=[Vulnerability | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+
+		('attack' attack=STRING)?
+		('attackVector' attackVector=VulnerabilityAttackVector)?
+		('score' score=DoubleOrInt)?
+
+		('solution' solution= RefRequirements)? // [Requirement | QualifiedName] )?  // For Threats, Shall be a Positive & Solution Requirement
+
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+RefRequirements:
+	refs+=[Requirement | QualifiedName] (',' refs+=[Requirement | QualifiedName] )*;
+
+
+//*******************************************************************************
+Risk: 
+	{Risk}'Risk' name=ID  (nameAlias=STRING)? ':' type=RiskType (':' subType=RiskSubType)? ('['
+		('isNegativeRequirement' negativeRequirement= [Requirement | QualifiedName] )?  // Can be further described by a Negative Requirement, e.g. misuse case
+		('partOf' ('optional' | 'mandatory')? partOf=[Risk | QualifiedName] )?  // ('optional' | 'mandatory') => (OR | AND); by default is OR 
+
+		('vulnerabilities' refVulnerabilities+=[Vulnerability | QualifiedName]  (',' refVulnerabilities+=[Vulnerability | QualifiedName] )*)?
+		(assessment = RiskAssessment)?
+		(treatments += RiskTreatment)*
+		('status' status = RiskStatus)?
+
+		(acceptanceCriteria+= AcceptanceCriteria)*
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;	
+	
+RiskAssessment:
+	{RiskAssessment} 'assessment' '[' 
+		('probability' probability = DoubleOrInt)?
+		('consequence' consequence = DoubleOrInt)?
+		('impact' impact = DoubleOrInt)?
+		('impactLevel' impactLevel = ImpactLevel)?
+	']';	
+	
+RiskTreatment:
+	{RiskTreatment} 'treatment' name=ID  (nameAlias=STRING)? ':' type=RiskTreatmentType ('['
+		('solution' solution= RefRequirements /* solution= [Requirement | QualifiedName] */ )?  // For Threats, Shall be a Positive & Solution Requirement
+		('owner' owner = [Stakeholder | QualifiedName] )?
+		('description' description = STRING)?
+	']')?; 	
+	
+Threat:	value = Risk;
+
+
+
+/********************************************************************************
+ * RelationSet-related Rule(s)
+*********************************************************************************/
+//*************
+ElementsRelation:
+	'ElementsRelation' name=ID  (nameAlias=STRING)? ':' type=ElementsRelationType ('['
+		'source' source=[SystemElement | QualifiedName] 
+		'target' target=[SystemElement | QualifiedName] 
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+//*************
+SystemsRelation:
+	'SystemsRelation' name=ID  (nameAlias=STRING)?  ':' type=SystemsRelationType ('['
+		'source' source=[System]
+		'target' target=[System]
+		'category' category=SystemsRelationCategory
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+//*************
+RequirementsRelation:
+	'RequirementsRelation' name=ID  (nameAlias=STRING)?  ':' type=RequirementsRelationType ('['
+		'source' source=[Requirement | QualifiedName] 
+		'target' target=[Requirement | QualifiedName] 
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+//*************
+TestsRelation:
+	'TestsRelation' name=ID  (nameAlias=STRING)?  ':' type=TestsRelationType ('['
+		'source' source=[Test | QualifiedName] 
+		'target' target=[Test | QualifiedName] 
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']')?;
+
+
+
+/********************************************************************************
+ * Set-related Rule(s)
+*********************************************************************************/
+
+//*************
+View: 
+	'View' name=ID  (nameAlias=STRING)? ':' type=ViewType ('['
+		elements = ReferenceElements
+//		references+=[SystemElement | QualifiedName]  (',' references+=[SystemElement | QualifiedName] )*
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']');
+
+
+//*************
+Theme: 
+	'Theme' name=ID  (nameAlias=STRING)? ':' type=ThemeType ('['
+		elements=ReferenceElements
+//		references+=[SystemElement | QualifiedName]  (',' references+=[SystemElement | QualifiedName] )*
+		(tags+=Tag)*
+		('description' description=STRING)?
+	']');
+
+ReferenceElements:
+	references+=[SystemElement | QualifiedName]  (',' references+=[SystemElement | QualifiedName] )* ;
+
+
+
+

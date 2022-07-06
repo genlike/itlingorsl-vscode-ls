@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!-- saved from url=(0022)http://localhost:3000/ -->
+<html><head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Workspace</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+    <link rel="stylesheet" href="./stylesheets/style.css">
+    <link rel="stylesheet" type="text/css" href="xtext/2.26.0/xtext-ace.css"/>
+    <script src="./javascripts/require.js"></script>
+    <script src="./javascripts/jquery-3.6.0.min.js"></script>
+</head>
+
+<body data-new-gr-c-s-check-loaded="14.1067.0" data-gr-ext-installed="" data-new-gr-c-s-loaded="14.1067.0">
+    <div class="main"> 
+        <div class="menubar"></div>
+        <div class="files">
+            <h1>Workspace ITLingo</h1>
+            <ul>
+                <li><img src="./images/folder.png">item1</li>
+                <li><img src="./images/folder.png">item2</li>
+                <li>item3</li>
+                <li>item4</li>
+                <li>item5</li>
+            </ul>
+        </div>
+        <div class="content">
+            <div id="xtext-editor" 
+            data-editor-enable-save-action="true" 
+            data-editor-enable-formatting-action="true" 
+            data-editor-xtext-lang="rsl" ></div>
+    </div>
+</div>
+            <script src="./webjars/2.3.6/require.min.js"></script>
+<script> 
+'strict mode'
+
+var baseUrl = window.location.pathname;
+var fileIndex = baseUrl.indexOf("index.html");
+
+if (fileIndex > 0)
+			baseUrl = baseUrl.slice(0, fileIndex);
+
+require.config({
+    baseUrl: baseUrl,
+    paths: {
+        "jquery": "webjars/jquery/3.3.1-1/jquery.min",
+        "ace/ext/language_tools": "webjars/ace/1.3.3/src/ext-language_tools",
+        "xtext/xtext-ace": "xtext/2.26.0/xtext-ace"
+    }
+});
+require(["webjars/ace/1.3.3/src/ace"], function() {
+    require(["xtext/xtext-ace"], function(xtext) {
+        var editor = xtext.createEditor(
+            {
+                baseUrl: baseUrl,
+                syntaxDefinition: 'xtext-resources/generated/mode-rsl.js',
+                enableCors: true
+            });
+        editor.setTheme("ace/theme/monokai");
+
+
+    });
+});
+
+</script></div>
+</body>
+<grammarly-desktop-integration data-grammarly-shadow-root="true"></grammarly-desktop-integration>
+
+</html>
