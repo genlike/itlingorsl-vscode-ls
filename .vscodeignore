@@ -2,3 +2,10 @@
 .gradle/**
 build/**
 *.gradle
+org.xtext.itlingo.rsl/
+org.xtext.itlingo.rsl.ide/
+org.xtext.itlingo.rsl.target/
+org.xtext.itlingo.rsl.tests/
+org.xtext.itlingo.rsl.ui/
+org.xtext.itlingo.rsl.ui.tests/
+org.xtext.itlingo.rsl.web/

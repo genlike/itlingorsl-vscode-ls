@@ -82,7 +82,7 @@ set CMD_LINE_ARGS=%*
 
 
 @rem Execute mydsl-standalone
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %MYDSL_STANDALONE_OPTS%  %CMD_LINE_ARGS% -jar %APP_HOME%\bin\org.itlingo.rsl.ide-1.0.0-SNAPSHOT-ls.jar
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %MYDSL_STANDALONE_OPTS%  %CMD_LINE_ARGS% -jar %APP_HOME%\bin\org.xtext.itlingo.rsl.ide-1.0.0-SNAPSHOT-ls.jar
 
 :end
 @rem End local scope for the variables with windows NT shell

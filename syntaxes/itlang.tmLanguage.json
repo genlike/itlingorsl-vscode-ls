@@ -9,7 +9,7 @@
         },
         {
             "name": "keyword.control.states",
-            "match": "\\b(DataEntity|attribute|constraints|Data|description|Event|mainScenario|UseCase|primaryActor|triggeredBy|dataEntity|precondition|step|extensionPoints|actions|triggeredBy|postcondition|dataEntity|scenario|ActionType|Actor|View|entity|extends|=>)\\b"
+            "match": "\\b(Data|DataEntity|attribute|constraints|Data|description|Event|mainScenario|UseCase|primaryActor|triggeredBy|dataEntity|precondition|step|extensionPoints|actions|triggeredBy|postcondition|dataEntity|scenario|ActionType|Actor|View|entity|extends|=>)\\b"
         },
         {
             "name": "keyword.operator.states",

@@ -1,2 +1,12 @@
 *.vsix
 .vscode
+org.xtext.itlingo.rsl/src-gen/
+org.xtext.itlingo.rsl/target/
+org.xtext.itlingo.rsl.ide/src-gen/
+org.xtext.itlingo.rsl.ide/target/
+org.xtext.itlingo.rsl.target/
+org.xtext.itlingo.rsl.tests/
+org.xtext.itlingo.rsl.ui/
+org.xtext.itlingo.rsl.ui.tests/
+org.xtext.itlingo.rsl.web/src-gen/
+org.xtext.itlingo.rsl.web/target/

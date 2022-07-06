@@ -45,11 +45,11 @@
         ],
         "commands": [
             {
-                "command": "itlang.a.proxy",
+                "command": "rsl.a.proxy",
                 "title": "RSL Command A"
             },
             {
-                "command": "itlang.b",
+                "command": "rsl.b",
                 "title": "RSL Command B"
             }
         ]

@@ -24,7 +24,7 @@ export function activate(context: ExtensionContext) {
         };
         
         let clientOptions: LanguageClientOptions = {
-            documentSelector: ['itlang'],
+            documentSelector: ['RSL'],
             synchronize: {
                 fileEvents: workspace.createFileSystemWatcher('**/*.*')
             }
@@ -33,14 +33,14 @@ export function activate(context: ExtensionContext) {
         // Create the language client and start the client.
         lc = new LanguageClient('Xtext Server', serverOptions, clientOptions);
         
-        var disposable2 =commands.registerCommand("itlang.a.proxy", async () => {
+        var disposable2 =commands.registerCommand("rsl.a.proxy", async () => {
             let activeEditor = window.activeTextEditor;
-            if (!activeEditor || !activeEditor.document || activeEditor.document.languageId !== 'itlang') {
+            if (!activeEditor || !activeEditor.document || activeEditor.document.languageId !== 'rsl') {
                 return;
             }
     
             if (activeEditor.document.uri instanceof Uri) {
-                commands.executeCommand("itlang.a", activeEditor.document.uri.toString());
+                commands.executeCommand("rsl.a", activeEditor.document.uri.toString());
             }
         })
         context.subscriptions.push(disposable2);
